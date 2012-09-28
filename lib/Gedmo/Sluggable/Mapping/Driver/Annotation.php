@@ -48,7 +48,8 @@ class Annotation extends AbstractAnnotationDriver
         // property annotations
         foreach ($class->getProperties() as $property) {
             if ($meta->isMappedSuperclass && !$property->isPrivate() ||
-                $meta->isInheritedField($property->name) ||
+                // TODO: Add @AttributeOverride support
+                //$meta->isInheritedField($property->name) ||
                 isset($meta->associationMappings[$property->name]['inherited'])
             ) {
                 continue;
@@ -83,6 +84,15 @@ class Annotation extends AbstractAnnotationDriver
                 if (!empty($meta->identifier) && $meta->isIdentifier($field) && !(bool)$slug->unique) {
                     throw new InvalidMappingException("Identifier field - [{$field}] slug must be unique in order to maintain primary key in class - {$meta->name}");
                 }
+                if (!is_array($slug->uniqueGroups)) {
+                    throw new InvalidMappingException("Slug annotation [uniqueGroups], type is not valid and must be 'array' in class - {$meta->name}");
+                }
+                foreach ($slug->uniqueGroups as $groupField) {
+                    if (!$meta->hasField($groupField) && !$meta->hasAssociation($groupField)
+                        && (!$meta->discriminatorColumn || $meta->discriminatorColumn['name'] != $groupField)) {
+                        throw new InvalidMappingException("Unable to find unique group [{$groupField}] as mapped property in entity - {$meta->name}");
+                    }
+                }
                 // set all options
                 $config['slugs'][$field] = array(
                     'fields' => $slug->fields,
@@ -90,6 +100,7 @@ class Annotation extends AbstractAnnotationDriver
                     'style' => $slug->style,
                     'updatable' => $slug->updatable,
                     'unique' => $slug->unique,
+                    'uniqueGroups' => $slug->uniqueGroups,
                     'separator' => $slug->separator,
                 );
             }

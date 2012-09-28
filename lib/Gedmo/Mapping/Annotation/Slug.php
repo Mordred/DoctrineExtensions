@@ -26,9 +26,10 @@ final class Slug extends Annotation
     public $style = 'default'; // or "camel"
     /** @var boolean */
     public $unique = true;
+    /** @var array */
+    public $uniqueGroups = array();
     /** @var string */
     public $separator = '-';
     /** @var array<Gedmo\Mapping\Annotation\SlugHandler> */
     public $handlers = array();
 }
-

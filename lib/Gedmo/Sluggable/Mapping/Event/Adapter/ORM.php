@@ -28,7 +28,6 @@ final class ORM extends BaseAdapterORM implements SluggableAdapter
         $wrapped = AbstractWrapper::wrap($object, $em);
         $qb = $em->createQueryBuilder();
         $qb->select('rec.' . $config['slug'])
-            ->from($config['useObjectClass'], 'rec')
             ->where($qb->expr()->like(
                 'rec.' . $config['slug'],
                 $qb->expr()->literal($slug . '%'))
@@ -41,6 +40,21 @@ final class ORM extends BaseAdapterORM implements SluggableAdapter
                 $qb->setParameter($id, $value);
             }
         }
+
+        // unique groups
+        if ($config['unique'] && $config['uniqueGroups']) {
+            foreach ($config['uniqueGroups'] as $group) {
+                if ($meta->discriminatorColumn && $meta->discriminatorColumn['name'] == $group) {
+                    $config['useObjectClass'] = $meta->name;
+                } else {
+                    $qb->andWhere($qb->expr()->eq("rec.{$group}", ":group_{$group}"));
+                    $qb->setParameter("group_{$group}", $meta->getReflectionProperty($group)->getValue($object));
+                }
+            }
+        }
+
+        $qb->from($config['useObjectClass'], 'rec');
+
         $q = $qb->getQuery();
         $q->setHydrationMode(Query::HYDRATE_ARRAY);
         return $q->execute();

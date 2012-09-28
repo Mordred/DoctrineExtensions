@@ -25,7 +25,7 @@ class NestedTreeRepository extends AbstractTreeRepository
     /**
      * {@inheritDoc}
      */
-    public function getRootNodesQueryBuilder($sortByField = null, $direction = 'asc')
+    public function getRootNodesQueryBuilder(array $groups = [], $sortByField = null, $direction = 'asc')
     {
         $meta = $this->getClassMetadata();
         $config = $this->listener->getConfiguration($this->_em, $meta->name);
@@ -35,6 +35,12 @@ class NestedTreeRepository extends AbstractTreeRepository
             ->from($config['useObjectClass'], 'node')
             ->where($qb->expr()->isNull('node.'.$config['parent']))
         ;
+
+        // TreeGroups
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
 
         if ($sortByField !== null) {
             $qb->orderBy('node.' . $sortByField, strtolower($direction) === 'asc' ? 'asc' : 'desc');
@@ -48,17 +54,17 @@ class NestedTreeRepository extends AbstractTreeRepository
     /**
      * {@inheritDoc}
      */
-    public function getRootNodesQuery($sortByField = null, $direction = 'asc')
+    public function getRootNodesQuery(array $groups = [], $sortByField = null, $direction = 'asc')
     {
-        return $this->getRootNodesQueryBuilder($sortByField, $direction)->getQuery();
+        return $this->getRootNodesQueryBuilder($groups, $sortByField, $direction)->getQuery();
     }
 
     /**
      * {@inheritDoc}
      */
-    public function getRootNodes($sortByField = null, $direction = 'asc')
+    public function getRootNodes(array $groups = [], $sortByField = null, $direction = 'asc')
     {
-        return $this->getRootNodesQuery($sortByField, $direction)->getResult();
+        return $this->getRootNodesQuery($groups, $sortByField, $direction)->getResult();
     }
 
     /**
@@ -146,6 +152,12 @@ class NestedTreeRepository extends AbstractTreeRepository
                 $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
             );
         }
+
+        $groups = $this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->_em, $node);
+        foreach($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
         return $qb;
     }
 
@@ -174,7 +186,7 @@ class NestedTreeRepository extends AbstractTreeRepository
     /**
      * @see getChildrenQueryBuilder
      */
-    public function childrenQueryBuilder($node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
+    public function childrenQueryBuilder(array $groups = [], $node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
     {
         $meta = $this->getClassMetadata();
         $config = $this->listener->getConfiguration($this->_em, $meta->name);
@@ -217,12 +229,25 @@ class NestedTreeRepository extends AbstractTreeRepository
                     $qb->where('('.$qb->getDqlPart('where').') OR node.'.$idField.' = :rootNode');
                     $qb->setParameter('rootNode', $node);
                 }
+
+                // TreeGroup
+                $groups = $groups ? $groups : $this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->_em, $node);
+                foreach ($groups as $field => $value) {
+                    $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                        ->setParameter("group_{$field}", $value);
+                }
             } else {
                 throw new \InvalidArgumentException("Node is not related to this repository");
             }
         } else {
             if ($direct) {
                 $qb->where($qb->expr()->isNull('node.' . $config['parent']));
+            }
+
+            // TreeGroup
+            foreach ($groups as $field => $value) {
+                $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                    ->setParameter("group_{$field}", $value);
             }
         }
         if (!$sortByField) {
@@ -247,42 +272,42 @@ class NestedTreeRepository extends AbstractTreeRepository
     /**
      * @see getChildrenQuery
      */
-    public function childrenQuery($node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
+    public function childrenQuery(array $groups = [], $node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
     {
-        return $this->childrenQueryBuilder($node, $direct, $sortByField, $direction, $includeNode)->getQuery();
+        return $this->childrenQueryBuilder($groups, $node, $direct, $sortByField, $direction, $includeNode)->getQuery();
     }
 
     /**
      * @see getChildren
      */
-    public function children($node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
+    public function children(array $groups = [], $node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
     {
-        $q = $this->childrenQuery($node, $direct, $sortByField, $direction, $includeNode);
+        $q = $this->childrenQuery($groups, $node, $direct, $sortByField, $direction, $includeNode);
         return $q->getResult();
     }
 
     /**
      * {@inheritDoc}
      */
-    public function getChildrenQueryBuilder($node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
+    public function getChildrenQueryBuilder(array $groups = [], $node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
     {
-        return $this->childrenQueryBuilder($node, $direct, $sortByField, $direction, $includeNode);
+        return $this->childrenQueryBuilder($groups, $node, $direct, $sortByField, $direction, $includeNode);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function getChildrenQuery($node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
+    public function getChildrenQuery(array $groups = [], $node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
     {
-        return $this->childrenQuery($node, $direct, $sortByField, $direction, $includeNode);
+        return $this->childrenQuery($groups, $node, $direct, $sortByField, $direction, $includeNode);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function getChildren($node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
+    public function getChildren(array $groups = [], $node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false)
     {
-        return $this->children($node, $direct, $sortByField, $direction, $includeNode);
+        return $this->children($groups, $node, $direct, $sortByField, $direction, $includeNode);
     }
 
     /**
@@ -294,7 +319,7 @@ class NestedTreeRepository extends AbstractTreeRepository
      * @throws InvalidArgumentException - if input is not valid
      * @return Doctrine\ORM\QueryBuilder
      */
-    public function getLeafsQueryBuilder($root = null, $sortByField = null, $direction = 'ASC')
+    public function getLeafsQueryBuilder(array $groups = [], $root = null, $sortByField = null, $direction = 'ASC')
     {
         $meta = $this->getClassMetadata();
         $config = $this->listener->getConfiguration($this->_em, $meta->name);
@@ -310,6 +335,12 @@ class NestedTreeRepository extends AbstractTreeRepository
             ->from($config['useObjectClass'], 'node')
             ->where($qb->expr()->eq('node.' . $config['right'], '1 + node.' . $config['left']))
         ;
+
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
+
         if (isset($config['root'])) {
             if ($root instanceof $meta->name) {
                 $wrapped = new EntityWrapper($root, $this->_em);
@@ -348,9 +379,9 @@ class NestedTreeRepository extends AbstractTreeRepository
      * @param string $direction - sort direction : "ASC" or "DESC"
      * @return Doctrine\ORM\Query
      */
-    public function getLeafsQuery($root = null, $sortByField = null, $direction = 'ASC')
+    public function getLeafsQuery(array $groups = [], $root = null, $sortByField = null, $direction = 'ASC')
     {
-        return $this->getLeafsQueryBuilder($root, $sortByField, $direction)->getQuery();
+        return $this->getLeafsQueryBuilder($groups, $root, $sortByField, $direction)->getQuery();
     }
 
     /**
@@ -361,9 +392,9 @@ class NestedTreeRepository extends AbstractTreeRepository
      * @param string $direction - sort direction : "ASC" or "DESC"
      * @return array
      */
-    public function getLeafs($root = null, $sortByField = null, $direction = 'ASC')
+    public function getLeafs(array $groups = [], $root = null, $sortByField = null, $direction = 'ASC')
     {
-        return $this->getLeafsQuery($root, $sortByField, $direction)->getResult();
+        return $this->getLeafsQuery($groups, $root, $sortByField, $direction)->getResult();
     }
 
     /**
@@ -409,6 +440,14 @@ class NestedTreeRepository extends AbstractTreeRepository
         } else {
             $qb->andWhere($qb->expr()->isNull('node.'.$config['parent']));
         }
+
+        // TreeGroup
+        $groups = $this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->_em, $node);
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
+
         return $qb;
     }
 
@@ -479,6 +518,14 @@ class NestedTreeRepository extends AbstractTreeRepository
         } else {
             $qb->andWhere($qb->expr()->isNull('node.'.$config['parent']));
         }
+
+        // TreeGroup
+        $groups = $this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->_em, $node);
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
+
         return $qb;
     }
 
@@ -592,11 +639,13 @@ class NestedTreeRepository extends AbstractTreeRepository
             $left = $wrapped->getPropertyValue($config['left']);
             $rootId = isset($config['root']) ? $wrapped->getPropertyValue($config['root']) : null;
 
+            $groups = $this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->_em, $node);
+
             if ($right == $left + 1) {
                 $this->removeSingle($wrapped);
                 $this->listener
                     ->getStrategy($this->_em, $meta->name)
-                    ->shiftRL($this->_em, $config['useObjectClass'], $right, -2, $rootId);
+                    ->shiftRL($this->_em, $config['useObjectClass'], $right, -2, $rootId, $groups);
                 return; // node was a leaf
             }
             // process updates in transaction
@@ -622,6 +671,11 @@ class NestedTreeRepository extends AbstractTreeRepository
                             $qb->expr()->eq('node.'.$config['parent'], is_string($nodeId) ? $qb->expr()->literal($nodeId) : $nodeId)
                         )
                     ;
+                    // TreeGroup
+                    foreach ($groups as $field => $value) {
+                        $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                            ->setParameter("group_{$field}", $value);
+                    }
                     $nodes = $qb->getQuery()->getArrayResult();
 
                     foreach ($nodes as $newRoot) {
@@ -640,6 +694,10 @@ class NestedTreeRepository extends AbstractTreeRepository
                             ->andWhere($qb->expr()->gte('node.'.$config['left'], $left))
                             ->andWhere($qb->expr()->lte('node.'.$config['right'], $right))
                         ;
+                        foreach ($groups as $field => $value) {
+                            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                                ->setParameter("group_{$field}", $value);
+                        }
                         $qb->getQuery()->getSingleScalarResult();
 
                         $qb = $this->_em->createQueryBuilder();
@@ -657,14 +715,19 @@ class NestedTreeRepository extends AbstractTreeRepository
                                 $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
                             )
                         ;
+                        // TreeGroup
+                        foreach ($groups as $field => $value) {
+                            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                                ->setParameter("group_{$field}", $value);
+                        }
                         $qb->getQuery()->getSingleScalarResult();
 
                         $this->listener
                             ->getStrategy($this->_em, $meta->name)
-                            ->shiftRangeRL($this->_em, $config['useObjectClass'], $left, $right, $shift, $rootId, $rootId, - 1);
+                            ->shiftRangeRL($this->_em, $config['useObjectClass'], $left, $right, $shift, $rootId, $rootId, - 1, $groups);
                         $this->listener
                             ->getStrategy($this->_em, $meta->name)
-                            ->shiftRL($this->_em, $config['useObjectClass'], $right, -2, $rootId);
+                            ->shiftRL($this->_em, $config['useObjectClass'], $right, -2, $rootId, $groups);
                     }
                 } else {
                     $qb = $this->_em->createQueryBuilder();
@@ -684,15 +747,20 @@ class NestedTreeRepository extends AbstractTreeRepository
                             $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
                         );
                     }
+                    // TreeGroup
+                    foreach ($groups as $field => $value) {
+                        $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                            ->setParameter("group_{$field}", $value);
+                    }
                     $qb->getQuery()->getSingleScalarResult();
 
                     $this->listener
                         ->getStrategy($this->_em, $meta->name)
-                        ->shiftRangeRL($this->_em, $config['useObjectClass'], $left, $right, $shift, $rootId, $rootId, - 1);
+                        ->shiftRangeRL($this->_em, $config['useObjectClass'], $left, $right, $shift, $rootId, $rootId, - 1, $groups);
 
                     $this->listener
                         ->getStrategy($this->_em, $meta->name)
-                        ->shiftRL($this->_em, $config['useObjectClass'], $right, -2, $rootId);
+                        ->shiftRL($this->_em, $config['useObjectClass'], $right, -2, $rootId, $groups);
                 }
                 $this->removeSingle($wrapped);
                 $this->_em->getConnection()->commit();
@@ -722,11 +790,11 @@ class NestedTreeRepository extends AbstractTreeRepository
         $meta = $this->getClassMetadata();
         if ($node instanceof $meta->name) {
             $config = $this->listener->getConfiguration($this->_em, $meta->name);
-            if ($verify && is_array($this->verify())) {
+            if ($verify && is_array($this->verify($this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->_em, $node)))) {
                 return false;
             }
 
-            $nodes = $this->children($node, true, $sortByField, $direction);
+            $nodes = $this->children($this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->_em, $node), $node, true, $sortByField, $direction);
             foreach ($nodes as $node) {
                 $wrapped = new EntityWrapper($node, $this->_em);
                 $right = $wrapped->getPropertyValue($config['right']);
@@ -750,7 +818,7 @@ class NestedTreeRepository extends AbstractTreeRepository
      *         boolean - true on success
      *         array - error list on failure
      */
-    public function verify()
+    public function verify(array $groups = [])
     {
         if (!$this->childCount()) {
             return true; // tree is empty
@@ -760,12 +828,12 @@ class NestedTreeRepository extends AbstractTreeRepository
         $meta = $this->getClassMetadata();
         $config = $this->listener->getConfiguration($this->_em, $meta->name);
         if (isset($config['root'])) {
-            $trees = $this->getRootNodes();
+            $trees = $this->getRootNodes($groups);
             foreach ($trees as $tree) {
-                $this->verifyTree($errors, $tree);
+                $this->verifyTree($groups, $errors, $tree);
             }
         } else {
-            $this->verifyTree($errors);
+            $this->verifyTree($groups, $errors);
         }
 
         return $errors ?: true;
@@ -789,12 +857,13 @@ class NestedTreeRepository extends AbstractTreeRepository
     /**
      * {@inheritDoc}
      */
-    public function getNodesHierarchyQueryBuilder($node = null, $direct = false, array $options = array(), $includeNode = false)
+    public function getNodesHierarchyQueryBuilder(array $groups = [], $node = null, $direct = false, array $options = array(), $includeNode = false)
     {
         $meta = $this->getClassMetadata();
         $config = $this->listener->getConfiguration($this->_em, $meta->name);
 
         return $this->childrenQueryBuilder(
+            $groups,
             $node,
             $direct,
             isset($config['root']) ? array($config['root'], $config['left']) : $config['left'],
@@ -806,17 +875,17 @@ class NestedTreeRepository extends AbstractTreeRepository
     /**
      * {@inheritDoc}
      */
-    public function getNodesHierarchyQuery($node = null, $direct = false, array $options = array(), $includeNode = false)
+    public function getNodesHierarchyQuery(array $groups = [], $node = null, $direct = false, array $options = array(), $includeNode = false)
     {
-        return $this->getNodesHierarchyQueryBuilder($node, $direct, $options, $includeNode)->getQuery();
+        return $this->getNodesHierarchyQueryBuilder($groups, $node, $direct, $options, $includeNode)->getQuery();
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getNodesHierarchy($node = null, $direct = false, array $options = array(), $includeNode = false)
+    public function getNodesHierarchy(array $groups = [], $node = null, $direct = false, array $options = array(), $includeNode = false)
     {
-        return $this->getNodesHierarchyQuery($node, $direct, $options, $includeNode)->getArrayResult();
+        return $this->getNodesHierarchyQuery($groups, $node, $direct, $options, $includeNode)->getArrayResult();
     }
 
     /**
@@ -835,7 +904,7 @@ class NestedTreeRepository extends AbstractTreeRepository
      * @param object $root
      * @return void
      */
-    private function verifyTree(&$errors, $root = null)
+    private function verifyTree(array $groups, &$errors, $root = null)
     {
         $meta = $this->getClassMetadata();
         $config = $this->listener->getConfiguration($this->_em, $meta->name);
@@ -851,6 +920,11 @@ class NestedTreeRepository extends AbstractTreeRepository
                 $qb->expr()->isNull('node.'.$config['root']) :
                 $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
             );
+        }
+        // TreeGroup
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
         }
         $min = intval($qb->getQuery()->getSingleScalarResult());
         $edge = $this->listener->getStrategy($this->_em, $meta->name)->max($this->_em, $config['useObjectClass'], $rootId);
@@ -869,6 +943,11 @@ class NestedTreeRepository extends AbstractTreeRepository
                     $qb->expr()->isNull('node.'.$config['root']) :
                     $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
                 );
+            }
+            // TreeGroup
+            foreach ($groups as $field => $value) {
+                $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                    ->setParameter("group_{$field}", $value);
             }
             $count = intval($qb->getQuery()->getSingleScalarResult());
             if ($count !== 1) {
@@ -893,6 +972,11 @@ class NestedTreeRepository extends AbstractTreeRepository
                 $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
             );
         }
+        // TreeGroup
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
         $nodes = $qb->getQuery()->getArrayResult();
         if (count($nodes)) {
             foreach ($nodes as $node) {
@@ -911,6 +995,11 @@ class NestedTreeRepository extends AbstractTreeRepository
                 $qb->expr()->isNull('node.'.$config['root']) :
                 $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
             );
+        }
+        // TreeGroup
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
         }
         $result = $qb->getQuery()
             ->setMaxResults(1)
@@ -931,6 +1020,11 @@ class NestedTreeRepository extends AbstractTreeRepository
                 $qb->expr()->isNull('node.'.$config['root']) :
                 $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
             );
+        }
+        // TreeGroup
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
         }
         $nodes = $qb->getQuery()->getResult(Query::HYDRATE_OBJECT);
 
@@ -968,6 +1062,11 @@ class NestedTreeRepository extends AbstractTreeRepository
                         $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
                     );
                 }
+                // TreeGroup
+                foreach ($groups as $field => $value) {
+                    $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                        ->setParameter("group_{$field}", $value);
+                }
                 if ($count = intval($qb->getQuery()->getSingleScalarResult())) {
                     $errors[] = "node [{$id}] parent field is blank, but it has a parent";
                 }
@@ -999,6 +1098,12 @@ class NestedTreeRepository extends AbstractTreeRepository
                 $qb->expr()->eq('node.'.$pk, is_string($nodeId) ? $qb->expr()->literal($nodeId) : $nodeId)
             )
         ;
+        // TreeGroup
+        $groups = $this->getGroupFields($this->_em, $wrapped->getObject());
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
         $qb->getQuery()->getSingleScalarResult();
 
         // remove the node from database
@@ -1009,9 +1114,15 @@ class NestedTreeRepository extends AbstractTreeRepository
                 $qb->expr()->eq('node.'.$pk, is_string($nodeId) ? $qb->expr()->literal($nodeId) : $nodeId)
             )
         ;
+        // TreeGroup
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
         $qb->getQuery()->getSingleScalarResult();
 
         // remove from identity map
         $this->_em->getUnitOfWork()->removeFromIdentityMap($wrapped->getObject());
     }
+
 }

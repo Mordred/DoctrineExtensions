@@ -19,7 +19,7 @@ interface RepositoryInterface extends RepositoryUtilsInterface
      *
      * @return array
      */
-    public function getRootNodes($sortByField = null, $direction = 'asc');
+    public function getRootNodes(array $groups = [], $sortByField = null, $direction = 'asc');
 
     /**
      * Returns an array of nodes suitable for method buildTree
@@ -31,7 +31,7 @@ interface RepositoryInterface extends RepositoryUtilsInterface
      *
      * @return array - Array of nodes
      */
-    public function getNodesHierarchy($node = null, $direct = false, array $options = array(), $includeNode = false);
+    public function getNodesHierarchy(array $groups = [], $node = null, $direct = false, array $options = array(), $includeNode = false);
 
     /**
      * Get list of children followed by given $node
@@ -43,7 +43,7 @@ interface RepositoryInterface extends RepositoryUtilsInterface
      * @param bool $includeNode - Include the root node in results?
      * @return array - list of given $node children, null on failure
      */
-    public function getChildren($node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false);
+    public function getChildren(array $groups = [], $node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false);
 
     /**
      * Counts the children of given TreeNode
@@ -53,5 +53,5 @@ interface RepositoryInterface extends RepositoryUtilsInterface
      * @throws \Gedmo\Exception\InvalidArgumentException - if input is not valid
      * @return integer
      */
-    public function childCount($node = null, $direct = false);
+    public function childCount(array $groups = [], $node = null, $direct = false);
 }

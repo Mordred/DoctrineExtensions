@@ -51,6 +51,11 @@ class Annotation extends AbstractAnnotationDriver
     const ROOT = 'Gedmo\\Mapping\\Annotation\\TreeRoot';
 
     /**
+     * Annotation to mark field as tree group
+     */
+    const GROUP = 'Gedmo\\Mapping\\Annotation\\TreeGroup';
+
+    /**
      * Annotation to specify closure tree class
      */
     const CLOSURE = 'Gedmo\\Mapping\\Annotation\\TreeClosure';
@@ -110,9 +115,10 @@ class Annotation extends AbstractAnnotationDriver
 
         // property annotations
         foreach ($class->getProperties() as $property) {
-            if ($meta->isMappedSuperclass && !$property->isPrivate() ||
-                $meta->isInheritedField($property->name) ||
-                isset($meta->associationMappings[$property->name]['inherited'])
+            if ($meta->isMappedSuperclass && !$property->isPrivate()
+                // TODO: Support @AttributeOverride and @AssociationOverride
+                //|| $meta->isInheritedField($property->name)
+                //|| isset($meta->associationMappings[$property->name]['inherited'])
             ) {
                 continue;
             }
@@ -206,6 +212,18 @@ class Annotation extends AbstractAnnotationDriver
                     throw new InvalidMappingException("Tree PathSource field - [{$field}] type is not valid. It must be \"date\" in class - {$meta->name}");
                 }
                 $config['lock_time'] = $field;
+            }
+
+            // groups
+            if ($group = $this->reader->getPropertyAnnotation($property, self::GROUP)) {
+                $field = $property->getName();
+                if (!$meta->hasField($field) && !$meta->hasAssociation($field)) {
+                    throw new InvalidMappingException("Unable to find 'group' - [{$field}] as mapped property in entity - {$meta->name}");
+                }
+                if (!isset($config['groups'])) {
+                    $config['groups'] = [];
+                }
+                $config['groups'][] = $field;
             }
         }
 

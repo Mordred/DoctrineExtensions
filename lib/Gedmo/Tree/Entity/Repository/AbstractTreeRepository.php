@@ -83,7 +83,7 @@ abstract class AbstractTreeRepository extends EntityRepository implements Reposi
     /**
      * {@inheritDoc}
      */
-    public function childCount($node = null, $direct = false)
+    public function childCount(array $groups = [], $node = null, $direct = false)
     {
         $meta = $this->getClassMetadata();
 
@@ -97,9 +97,12 @@ abstract class AbstractTreeRepository extends EntityRepository implements Reposi
             if (!$wrapped->hasValidIdentifier()) {
                 throw new InvalidArgumentException("Node is not managed by UnitOfWork");
             }
+
+            if (!$groups)
+                $groups = $this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->getEntityManager(), $node);
         }
 
-        $qb = $this->getChildrenQueryBuilder($node, $direct);
+        $qb = $this->getChildrenQueryBuilder($groups, $node, $direct);
 
         // We need to remove the ORDER BY DQL part since some vendors could throw an error
         // in count queries
@@ -175,7 +178,7 @@ abstract class AbstractTreeRepository extends EntityRepository implements Reposi
      *
      * @return \Doctrine\ORM\QueryBuilder - QueryBuilder object
      */
-    abstract public function getRootNodesQueryBuilder($sortByField = null, $direction = 'asc');
+    abstract public function getRootNodesQueryBuilder(array $groups = [], $sortByField = null, $direction = 'asc');
 
     /**
      * Get all root nodes query
@@ -185,7 +188,7 @@ abstract class AbstractTreeRepository extends EntityRepository implements Reposi
      *
      * @return \Doctrine\ORM\Query - Query object
      */
-    abstract public function getRootNodesQuery($sortByField = null, $direction = 'asc');
+    abstract public function getRootNodesQuery(array $goups = [], $sortByField = null, $direction = 'asc');
 
     /**
      * Returns a QueryBuilder configured to return an array of nodes suitable for buildTree method
@@ -197,7 +200,7 @@ abstract class AbstractTreeRepository extends EntityRepository implements Reposi
      *
      * @return \Doctrine\ORM\QueryBuilder - QueryBuilder object
      */
-    abstract public function getNodesHierarchyQueryBuilder($node = null, $direct = false, array $options = array(), $includeNode = false);
+    abstract public function getNodesHierarchyQueryBuilder(array $groups = [], $node = null, $direct = false, array $options = array(), $includeNode = false);
 
     /**
      * Returns a Query configured to return an array of nodes suitable for buildTree method
@@ -209,7 +212,7 @@ abstract class AbstractTreeRepository extends EntityRepository implements Reposi
      *
      * @return \Doctrine\ORM\Query - Query object
      */
-    abstract public function getNodesHierarchyQuery($node = null, $direct = false, array $options = array(), $includeNode = false);
+    abstract public function getNodesHierarchyQuery(array $groups = [], $node = null, $direct = false, array $options = array(), $includeNode = false);
 
     /**
      * Get list of children followed by given $node. This returns a QueryBuilder object
@@ -222,7 +225,7 @@ abstract class AbstractTreeRepository extends EntityRepository implements Reposi
      *
      * @return \Doctrine\ORM\QueryBuilder - QueryBuilder object
      */
-    abstract public function getChildrenQueryBuilder($node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false);
+    abstract public function getChildrenQueryBuilder(array $groups = [], $node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false);
 
     /**
      * Get list of children followed by given $node. This returns a Query
@@ -235,5 +238,5 @@ abstract class AbstractTreeRepository extends EntityRepository implements Reposi
      *
      * @return \Doctrine\ORM\Query - Query object
      */
-    abstract public function getChildrenQuery($node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false);
+    abstract public function getChildrenQuery(array $groups = [], $node = null, $direct = false, $sortByField = null, $direction = 'ASC', $includeNode = false);
 }

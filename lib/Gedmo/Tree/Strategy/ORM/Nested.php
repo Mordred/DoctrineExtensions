@@ -196,6 +196,10 @@ class Nested implements Strategy
         if (!$leftValue || !$rightValue) {
             return;
         }
+
+        // Groups
+        $groups = $this->getGroupFields($em, $node);
+
         $rootId = isset($config['root']) ? $wrapped->getPropertyValue($config['root']) : null;
         $diff = $rightValue - $leftValue + 1;
         if ($diff > 2) {
@@ -212,6 +216,12 @@ class Nested implements Strategy
                     $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
                 );
             }
+
+            foreach ($groups as $field => $value) {
+                $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                    ->setParameter("group_{$field}", $value);
+            }
+
             $q = $qb->getQuery();
             // get nodes for deletion
             $nodes = $q->getResult();
@@ -219,7 +229,7 @@ class Nested implements Strategy
                 $uow->scheduleForDelete($removalNode);
             }
         }
-        $this->shiftRL($em, $config['useObjectClass'], $rightValue + 1, -$diff, $rootId);
+        $this->shiftRL($em, $config['useObjectClass'], $rightValue + 1, -$diff, $rootId, $groups);
     }
 
     /**
@@ -284,6 +294,7 @@ class Nested implements Strategy
         $wrapped = AbstractWrapper::wrap($node, $em);
         $meta = $wrapped->getMetadata();
         $config = $this->listener->getConfiguration($em, $meta->name);
+        $groups = $this->getGroupFields($em, $node);
 
         $rootId = isset($config['root']) ? $wrapped->getPropertyValue($config['root']) : null;
         $identifierField = $meta->getSingleIdentifierFieldName();
@@ -359,7 +370,7 @@ class Nested implements Strategy
                     $level++;
                     break;
             }
-            $this->shiftRL($em, $config['useObjectClass'], $start, $treeSize, $parentRootId);
+            $this->shiftRL($em, $config['useObjectClass'], $start, $treeSize, $parentRootId, $groups);
             if (!$isNewNode && $rootId === $parentRootId && $left >= $start) {
                 $left += $treeSize;
                 $wrapped->setPropertyValue($config['left'], $left);
@@ -371,7 +382,7 @@ class Nested implements Strategy
             $newRootId = $parentRootId;
         } elseif (!isset($config['root'])) {
             $start = isset($this->treeEdges[$meta->name]) ?
-                $this->treeEdges[$meta->name] : $this->max($em, $config['useObjectClass']);
+                $this->treeEdges[$meta->name] : $this->max($em, $config['useObjectClass'], 0, $groups);
             $this->treeEdges[$meta->name] = $start + 2;
             $start++;
         } else {
@@ -390,9 +401,10 @@ class Nested implements Strategy
                 $diff,
                 $rootId,
                 $newRootId,
-                $levelDiff
+                $levelDiff,
+                $groups
             );
-            $this->shiftRL($em, $config['useObjectClass'], $left, -$treeSize, $rootId);
+            $this->shiftRL($em, $config['useObjectClass'], $left, -$treeSize, $rootId, $groups);
         } else {
             $qb = $em->createQueryBuilder();
             $qb->update($config['useObjectClass'], 'node');
@@ -423,6 +435,10 @@ class Nested implements Strategy
             $qb->set('node.' . $config['right'], $right + $diff);
             // node id cannot be null
             $qb->where($qb->expr()->eq('node.'.$identifierField, is_string($nodeId) ? $qb->expr()->literal($nodeId) : $nodeId));
+            foreach ($groups as $field => $value) {
+                $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                    ->setParameter("group_{$field}", $value);
+            }
             $qb->getQuery()->getSingleScalarResult();
             $wrapped->setPropertyValue($config['left'], $left + $diff);
             $wrapped->setPropertyValue($config['right'], $right + $diff);
@@ -444,7 +460,7 @@ class Nested implements Strategy
      * @param integer $rootId
      * @return integer
      */
-    public function max(EntityManager $em, $class, $rootId = 0)
+    public function max(EntityManager $em, $class, $rootId = 0, array $groups = [])
     {
         $meta = $em->getClassMetadata($class);
         $config = $this->listener->getConfiguration($em, $meta->name);
@@ -459,6 +475,12 @@ class Nested implements Strategy
                 $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
             );
         }
+
+        // TreeGroup
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
         $query = $qb->getQuery();
         $right = $query->getSingleScalarResult();
         return intval($right);
@@ -472,9 +494,10 @@ class Nested implements Strategy
      * @param integer $first
      * @param integer $delta
      * @param integer|string $rootId
+     * @param array $groups
      * @return void
      */
-    public function shiftRL(EntityManager $em, $class, $first, $delta, $rootId = null)
+    public function shiftRL(EntityManager $em, $class, $first, $delta, $rootId = null, array $groups = [])
     {
         $meta = $em->getClassMetadata($class);
         $config = $this->listener->getConfiguration($em, $class);
@@ -492,6 +515,10 @@ class Nested implements Strategy
                 $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
             );
         }
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
+        }
         $qb->getQuery()->getSingleScalarResult();
 
         $qb = $em->createQueryBuilder();
@@ -504,6 +531,11 @@ class Nested implements Strategy
                 $qb->expr()->isNull('node.'.$config['root']) :
                 $qb->expr()->eq('node.'.$config['root'], is_string($rootId) ? $qb->expr()->literal($rootId) : $rootId)
             );
+        }
+
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
         }
 
         $qb->getQuery()->getSingleScalarResult();
@@ -545,9 +577,10 @@ class Nested implements Strategy
      * @param integer|string $rootId
      * @param integer|string $destRootId
      * @param integer $levelDelta
+     * @param array $groups
      * @return void
      */
-    public function shiftRangeRL(EntityManager $em, $class, $first, $last, $delta, $rootId = null, $destRootId = null, $levelDelta = null)
+    public function shiftRangeRL(EntityManager $em, $class, $first, $last, $delta, $rootId = null, $destRootId = null, $levelDelta = null, array $groups = [])
     {
         $meta = $em->getClassMetadata($class);
         $config = $this->listener->getConfiguration($em, $class);
@@ -576,6 +609,10 @@ class Nested implements Strategy
         }
         if (isset($config['level'])) {
             $qb->set('node.'.$config['level'], "node.{$config['level']} {$levelSign} {$absLevelDelta}");
+        }
+        foreach ($groups as $field => $value) {
+            $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
+                ->setParameter("group_{$field}", $value);
         }
         $qb->getQuery()->getSingleScalarResult();
         // update in memory nodes increases performance, saves some IO
@@ -612,4 +649,27 @@ class Nested implements Strategy
             }
         }
     }
+
+    public function getGroupFields($em, $object) {
+        $meta = $em->getClassMetadata(get_class($object));
+        $config = $this->listener->getConfiguration($em, $meta->name);
+
+        if (!isset($config['groups'])) {
+            return [];
+        }
+
+        $groups = [];
+
+        foreach ($config['groups'] as $field) {
+            if ($meta->hasField($field)) {
+                $groups[$field] = $meta->getReflectionProperty($field)->getValue($object);
+            } elseif ($meta->hasAssociation($field)) {
+                $wrapped = \Gedmo\Tool\Wrapper\AbstractWrapper::wrap($meta->getReflectionProperty($field)->getValue($object), $em);
+                $groups[$field] = $wrapped->getIdentifier();
+            }
+        }
+
+        return $groups;
+    }
+
 }
