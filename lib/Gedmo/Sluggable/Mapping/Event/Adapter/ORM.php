@@ -41,6 +41,65 @@ final class ORM extends BaseAdapterORM implements SluggableAdapter
             }
         }
 
+        $this->addUniqueGroupsToQueryBuilder($qb, $object, $config);
+
+        $qb->from($config['useObjectClass'], 'rec');
+
+        $q = $qb->getQuery();
+        $q->setHydrationMode(Query::HYDRATE_ARRAY);
+        return $q->execute();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function replaceRelative($object, array $config, $target, $replacement)
+    {
+        $em = $this->getObjectManager();
+        $qb = $em->createQueryBuilder();
+        $qb->update($config['useObjectClass'], 'rec')
+            ->set('rec.'.$config['slug'], $qb->expr()->concat(
+                $qb->expr()->literal($replacement),
+                $qb->expr()->substring('rec.'.$config['slug'], strlen($target))
+            ))
+            ->where($qb->expr()->like(
+                'rec.'.$config['slug'],
+                $qb->expr()->literal($target . '%'))
+            )
+        ;
+
+        $this->addUniqueGroupsToQueryBuilder($qb, $object, $config);
+
+        // update in memory
+        $q = $qb->getQuery();
+        return $q->execute();
+    }
+
+    /**
+    * {@inheritDoc}
+     */
+    public function replaceInverseRelative($object, array $config, $target, $replacement)
+    {
+        $em = $this->getObjectManager();
+        $qb = $em->createQueryBuilder();
+        $qb->update($config['useObjectClass'], 'rec')
+            ->set('rec.'.$config['slug'], $qb->expr()->concat(
+               $qb->expr()->literal($target),
+                $qb->expr()->substring('rec.'.$config['slug'], strlen($replacement)+1)
+            ))
+            ->where('rec.'.$config['mappedBy'].' = :object')
+        ;
+
+        $this->addUniqueGroupsToQueryBuilder($qb, $object, $config);
+
+        $q = $qb->getQuery();
+        $q->setParameters(compact('object'));
+        return $q->execute();
+    }
+
+    private function addUniqueGroupsToQueryBuilder($qb, $object, $config) {
+        $meta = $this->getObjectManager()->getClassMetadata(get_class($object));
+
         // unique groups
         if ($config['unique'] && $config['uniqueGroups']) {
             foreach ($config['uniqueGroups'] as $group) {
@@ -52,11 +111,6 @@ final class ORM extends BaseAdapterORM implements SluggableAdapter
                 }
             }
         }
-
-        $qb->from($config['useObjectClass'], 'rec');
-
-        $q = $qb->getQuery();
-        $q->setHydrationMode(Query::HYDRATE_ARRAY);
-        return $q->execute();
     }
+
 }

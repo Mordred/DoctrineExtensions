@@ -48,6 +48,13 @@ class SluggableListener extends MappedEventSubscriber
      */
     private $persistedSlugs = array();
 
+     /**
+     * List of initialized slug handlers
+     *
+     * @var array
+     */
+    private $handlers = array();
+
     /**
      * Specifies the list of events to listen
      *
@@ -170,6 +177,20 @@ class SluggableListener extends MappedEventSubscriber
         return __NAMESPACE__;
     }
 
+    /*
+     * Get the slug handler instance by $class name
+     *
+     * @param string $class
+     * @return Gedmo\Sluggable\Handler\SlugHandlerInterface
+     */
+    private function getHandler($class)
+    {
+        if (!isset($this->handlers[$class])) {
+            $this->handlers[$class] = new $class($this);
+        }
+        return $this->handlers[$class];
+    }
+
     /**
      * Creates the slug for object being flushed
      *
@@ -188,6 +209,7 @@ class SluggableListener extends MappedEventSubscriber
         $isInsert = $uow->isScheduledForInsert($object);
         $config = $this->getConfiguration($om, $meta->name);
         foreach ($config['slugs'] as $slugField => $options) {
+            $hasHandlers = count($options['handlers']);
             $options['useObjectClass'] = $config['useObjectClass'];
             $fields = $options['fields'];
             // collect the slug from fields
@@ -196,6 +218,7 @@ class SluggableListener extends MappedEventSubscriber
             if (!$options['updatable'] && !$isInsert && (!isset($changeSet[$slugField]) || $slug === '__id__')) {
                 continue;
             }
+            $slug = '';
             $needToChangeSlug = false;
             // if slug is null or set to empty, regenerate it, or needs an update
             if (empty($slug) || $slug === '__id__' || !isset($changeSet[$slugField])) {
@@ -210,18 +233,44 @@ class SluggableListener extends MappedEventSubscriber
                 // slug was set manually
                 $needToChangeSlug = true;
             }
+            $slug = trim($slug);
+
+            // notify slug handlers --> onChangeDecision
+            if ($hasHandlers) {
+                foreach ($options['handlers'] as $class => $handlerOptions) {
+                    $this->getHandler($class)
+                        ->onChangeDecision($ea, $options, $object, $slug, $needToChangeSlug);
+                }
+            }
+
             // if slug is changed, do further processing
             if ($needToChangeSlug) {
                 $mapping = $meta->getFieldMapping($slugField);
                 if (!strlen(trim($slug)) && (!isset($mapping['nullable']) || !$mapping['nullable'])) {
                     throw new \Gedmo\Exception\UnexpectedValueException("Unable to find any non empty sluggable fields for slug [{$slugField}] , make sure they have something at least.");
                 }
+
+                // notify slug handlers --> postSlugBuild
+                $urlized = false;
+                if ($hasHandlers) {
+                    foreach ($options['handlers'] as $class => $handlerOptions) {
+                        $this
+                            ->getHandler($class)
+                            ->postSlugBuild($ea, $options, $object, $slug)
+                        ;
+                        if($this->getHandler($class)->handlesUrlization()){
+                            $urlized = true;
+                        }
+                    }
+                }
+
                 // build the slug
                 $slug = call_user_func_array(
                     $this->transliterator,
                     array($slug, $options['separator'], $object)
                 );
-                $slug = Util\Urlizer::urlize($slug, $options['separator']);
+                if (!$urlized)
+                    $slug = Util\Urlizer::urlize($slug, $options['separator']);
                 // stylize the slug
                 switch ($options['style']) {
                     case 'camel':
@@ -264,6 +313,17 @@ class SluggableListener extends MappedEventSubscriber
                     $this->exponent = 0;
                     $slug = $this->makeUniqueSlug($ea, $object, $slug, false, $options);
                 }
+
+                // notify slug handlers --> onSlugCompletion
+                if ($hasHandlers) {
+                    foreach ($options['handlers'] as $class => $handlerOptions) {
+                        $this
+                            ->getHandler($class)
+                            ->onSlugCompletion($ea, $options, $object, $slug)
+                        ;
+                    }
+                }
+
                 // set the final slug
                 $meta->getReflectionProperty($slugField)->setValue($object, $slug);
                 // recompute changeset
