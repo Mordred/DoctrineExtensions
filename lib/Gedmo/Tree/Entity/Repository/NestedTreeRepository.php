@@ -1099,7 +1099,7 @@ class NestedTreeRepository extends AbstractTreeRepository
             )
         ;
         // TreeGroup
-        $groups = $this->getGroupFields($this->_em, $wrapped->getObject());
+        $groups = $this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->_em, $wrapped->getObject());
         foreach ($groups as $field => $value) {
             $qb->andWhere($qb->expr()->eq("node.{$field}", ":group_{$field}"))
                 ->setParameter("group_{$field}", $value);
