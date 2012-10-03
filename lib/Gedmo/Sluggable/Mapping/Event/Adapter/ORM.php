@@ -97,7 +97,7 @@ final class ORM extends BaseAdapterORM implements SluggableAdapter
         return $q->execute();
     }
 
-    private function addUniqueGroupsToQueryBuilder($qb, $object, $config) {
+    private function addUniqueGroupsToQueryBuilder($qb, $object, &$config) {
         $meta = $this->getObjectManager()->getClassMetadata(get_class($object));
 
         // unique groups
