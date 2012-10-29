@@ -238,8 +238,8 @@ class LoggableListener extends MappedEventSubscriber
             }
             $uow = $om->getUnitOfWork();
             $logEntry->setObjectId($objectId);
+            $newValues = array();
             if ($action !== self::ACTION_REMOVE && isset($config['versioned'])) {
-                $newValues = array();
                 foreach ($ea->getObjectChangeSet($uow, $object) as $field => $changes) {
                     if (!in_array($field, $config['versioned'])) {
                         continue;
@@ -260,6 +260,11 @@ class LoggableListener extends MappedEventSubscriber
                 }
                 $logEntry->setData($newValues);
             }
+            
+            if($action === self::ACTION_UPDATE && 0 === count($newValues)) {
+                return;
+            }
+            
             $version = 1;
             if ($action !== self::ACTION_CREATE) {
                 $version = $ea->getNewVersion($logEntryMeta, $object);

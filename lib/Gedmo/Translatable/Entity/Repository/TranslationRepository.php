@@ -60,10 +60,8 @@ class TranslationRepository extends EntityRepository
         if (!isset($config['fields']) || !in_array($field, $config['fields'])) {
             throw new \Gedmo\Exception\InvalidArgumentException("Entity: {$meta->name} does not translate field - {$field}");
         }
-        $modRecordValue = (!$listener->getPersistDefaultLocaleTranslation() && $locale === $listener->getDefaultLocale())
-            || $listener->getTranslatableLocale($entity, $meta) === $locale
-        ;
-        if ($modRecordValue) {
+        $needsPersist = TRUE;
+        if ($locale === $listener->getTranslatableLocale($entity, $meta)) {
             $meta->getReflectionProperty($field)->setValue($entity, $value);
             $this->_em->persist($entity);
         } else {
@@ -85,17 +83,20 @@ class TranslationRepository extends EntityRepository
                 $transMeta->getReflectionProperty('locale')->setValue($trans, $locale);
                 if ($listener->getDefaultLocale() != $listener->getTranslatableLocale($entity, $meta) &&
                     $locale === $listener->getDefaultLocale()) {
-                    $listener->setTranslationInDefaultLocale(spl_object_hash($entity), $trans);
+                    $listener->setTranslationInDefaultLocale(spl_object_hash($entity), $field, $trans);
+                    $needsPersist = $listener->getPersistDefaultLocaleTranslation();
                 }
             }
             $type = Type::getType($meta->getTypeOfField($field));
             $transformed = $type->convertToDatabaseValue($value, $this->_em->getConnection()->getDatabasePlatform());
             $transMeta->getReflectionProperty('content')->setValue($trans, $transformed);
-            if ($this->_em->getUnitOfWork()->isInIdentityMap($entity)) {
-                $this->_em->persist($trans);
-            } else {
-                $oid = spl_object_hash($entity);
-                $listener->addPendingTranslationInsert($oid, $trans);
+            if ($needsPersist) {
+                if ($this->_em->getUnitOfWork()->isInIdentityMap($entity)) {
+                    $this->_em->persist($trans);
+                } else {
+                    $oid = spl_object_hash($entity);
+                    $listener->addPendingTranslationInsert($oid, $trans);
+                }
             }
         }
         return $this;
