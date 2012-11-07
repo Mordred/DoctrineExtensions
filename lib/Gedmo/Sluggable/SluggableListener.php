@@ -217,7 +217,6 @@ class SluggableListener extends MappedEventSubscriber
             if (!$options['updatable'] && !$isInsert && (!isset($changeSet[$slugField]) || $slug === '__id__')) {
                 continue;
             }
-            $slug = '';
             $needToChangeSlug = false;
             // if slug is null or set to empty, regenerate it, or needs an update
             if (empty($slug) || $slug === '__id__' || !isset($changeSet[$slugField])) {
@@ -269,7 +268,7 @@ class SluggableListener extends MappedEventSubscriber
                     array($slug, $options['separator'], $object)
                 );
                 if (!$urlized)
-                    $slug = Util\Urlizer::urlize($slug, $options['separator']);
+                    $slug = Util\Urlizer::urlize($slug, $options['separator'], $options['allowed']);
                 // stylize the slug
                 switch ($options['style']) {
                     case 'camel':

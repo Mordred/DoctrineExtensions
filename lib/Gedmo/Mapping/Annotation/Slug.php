@@ -30,6 +30,8 @@ final class Slug extends Annotation
     public $uniqueGroups = array();
     /** @var string */
     public $separator = '-';
+    /** @var string */
+    public $allowed = NULL;
     /** @var array<Gedmo\Mapping\Annotation\SlugHandler> */
     public $handlers = array();
 }

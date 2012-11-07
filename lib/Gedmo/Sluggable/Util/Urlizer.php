@@ -258,10 +258,10 @@ class Urlizer
      * @param string $separator
      * @return string
      */
-    public static function urlize($text, $separator = '-')
+    public static function urlize($text, $separator = '-', $allowed = NULL)
     {
         $text = self::unaccent($text);
-        return self::postProcessText($text, $separator);
+        return self::postProcessText($text, $separator, $allowed);
     }
 
     /**
@@ -400,7 +400,7 @@ class Urlizer
      * @param string $separator
      * @return string
      */
-    private static function postProcessText($text, $separator)
+    private static function postProcessText($text, $separator, $allowed = NULL)
     {
         if (function_exists('mb_strtolower')) {
             $text = mb_strtolower($text);
@@ -409,13 +409,7 @@ class Urlizer
         }
 
         // Remove all none word characters
-        $text = preg_replace('/\W/', ' ', $text);
-
-        // More stripping. Replace spaces with dashes
-        $text = strtolower(preg_replace('/[^A-Z^a-z^0-9^\/]+/', $separator,
-                           preg_replace('/([a-z\d])([A-Z])/', '\1_\2',
-                           preg_replace('/([A-Z]+)([A-Z][a-z])/', '\1_\2',
-                           preg_replace('/::/', '/', $text)))));
+        $text = preg_replace('#[^a-z0-9' . preg_quote($allowed, '#') . ']+#i', $separator, $text);
 
         return trim($text, $separator);
     }
