@@ -51,4 +51,12 @@ interface SluggableAdapter extends AdapterInterface
     * @return integer
     */
     function replaceInverseRelative($object, array $config, $target, $replacement);
+
+    /**
+     * Get default SlugEntry class used to store the slugs
+     *
+     * @return string
+     */
+    function getDefaultSlugEntryClass();
+
 }

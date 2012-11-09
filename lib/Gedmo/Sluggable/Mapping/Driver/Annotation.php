@@ -22,6 +22,7 @@ use Gedmo\Mapping\Driver\AbstractAnnotationDriver,
  */
 class Annotation extends AbstractAnnotationDriver
 {
+
     /**
      * Annotation to identify field as one which holds the slug
      * together with slug options
@@ -37,6 +38,11 @@ class Annotation extends AbstractAnnotationDriver
      * SlugHandler option annotation
      */
     const HANDLER_OPTION ='Gedmo\\Mapping\\Annotation\\SlugHandlerOption';
+
+    /**
+     * Slug history annotation
+     */
+    const SLUG_HISTORY = 'Gedmo\\Mapping\\Annotation\\SlugHistory';
 
     /**
      * List of types which are valid for slug and sluggable fields
@@ -83,8 +89,8 @@ class Annotation extends AbstractAnnotationDriver
                         if (!strlen($handler->class)) {
                             throw new InvalidMappingException("SlugHandler class: {$handler->class} should be a valid class name in entity - {$meta->name}");
                         }
-                        $class = $handler->class;
-                        $handlers[$class] = array();
+                        $handlerClass = $handler->class;
+                        $handlers[$handlerClass] = array();
                         foreach ((array)$handler->options as $option) {
                             if (!$option instanceof SlugHandlerOption) {
                                 throw new InvalidMappingException("SlugHandlerOption: {$option} should be instance of SlugHandlerOption annotation in entity - {$meta->name}");
@@ -92,9 +98,9 @@ class Annotation extends AbstractAnnotationDriver
                             if (!strlen($option->name)) {
                                 throw new InvalidMappingException("SlugHandlerOption name: {$option->name} should be valid name in entity - {$meta->name}");
                             }
-                            $handlers[$class][$option->name] = $option->value;
+                            $handlers[$handlerClass][$option->name] = $option->value;
                         }
-                        $class::validate($handlers[$class], $meta);
+                        $handlerClass::validate($handlers[$handlerClass], $meta);
                     }
                 }
 
@@ -140,6 +146,23 @@ class Annotation extends AbstractAnnotationDriver
                     'allowed' => $slug->allowed,
                     'handlers' => $handlers
                 );
+            }
+        }
+
+        // class annotations
+        if ($config && ($annot = $this->reader->getClassAnnotation($class, self::SLUG_HISTORY))) {
+            $config['slugHistory'] = TRUE;
+            if ($annot->slugEntryClass) {
+                if (!class_exists($annot->slugEntryClass)) {
+                    throw new InvalidMappingException("SlugEntry class: {$annot->slugEntryClass} does not exist.");
+                }
+                $config['slugEntryClass'] = $annot->slugEntryClass;
+            }
+        }
+
+        if (!$meta->isMappedSuperclass && isset($config['slugHistory']) && $config['slugHistory']) {
+            if (is_array($meta->identifier) && count($meta->identifier) > 1) {
+                throw new InvalidMappingException("Slug history does not support composite identifiers in class - {$meta->name}");
             }
         }
     }

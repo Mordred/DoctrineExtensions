@@ -6,6 +6,7 @@ use Doctrine\Common\EventArgs;
 use Gedmo\Mapping\MappedEventSubscriber;
 use Gedmo\Sluggable\Mapping\Event\SluggableAdapter;
 use Doctrine\Common\Persistence\ObjectManager;
+use Gedmo\Tool\Wrapper\AbstractWrapper;
 
 /**
  * The SluggableListener handles the generation of slugs
@@ -16,6 +17,7 @@ use Doctrine\Common\Persistence\ObjectManager;
  *
  * @author Gediminas Morkevicius <gediminas.morkevicius@gmail.com>
  * @author Klein Florian <florian.klein@free.fr>
+ * @author Martin Jantosovic <jantosovic.martin@gmail.com>
  * @subpackage SluggableListener
  * @package Gedmo.Sluggable
  * @link http://www.gediminasm.org
@@ -23,6 +25,16 @@ use Doctrine\Common\Persistence\ObjectManager;
  */
 class SluggableListener extends MappedEventSubscriber
 {
+
+    /**
+     * Update action
+     */
+    const ACTION_UPDATE = 'update';
+
+    /**
+     * Remove action
+     */
+    const ACTION_REMOVE = 'remove';
 
     /**
      * The power exponent to jump
@@ -164,9 +176,21 @@ class SluggableListener extends MappedEventSubscriber
                 foreach ($config['slugs'] as $slugField => $options) {
                     $slug = $meta->getReflectionProperty($slugField)->getValue($object);
                     $this->persistedSlugs[$config['useObjectClass']][$slugField][] = $slug;
+	                // Store old slug to slug history
+					$this->createSlugEntry($slugField, $object, $ea);
                 }
             }
         }
+		// Delete all slug history entries
+		// if the entity is deleted
+		foreach ($ea->getScheduledObjectDeletions($uow) as $object) {
+            $meta = $om->getClassMetadata(get_class($object));
+			if ($config = $this->getConfiguration($om, $meta->name)) {
+				foreach ($config['slugs'] as $slugField => $options) {
+					$this->deleteSlugEntries($slugField, $object, $ea);
+				}
+			}
+		}
     }
 
     /**
@@ -422,4 +446,92 @@ class SluggableListener extends MappedEventSubscriber
         }
     }
 
+    /**
+     * Create a new Slug history instance
+     *
+     * @param object $object
+     * @param LoggableAdapter $ea
+     * @return void
+     */
+    protected function createSlugEntry($field, $object, SluggableAdapter $ea)
+    {
+        $om = $ea->getObjectManager();
+        $wrapped = AbstractWrapper::wrap($object, $om);
+        $meta = $wrapped->getMetadata();
+		$uow = $om->getUnitOfWork();
+		$changeSet = $ea->getObjectChangeSet($uow, $object);
+        if (($config = $this->getConfiguration($om, $meta->name))
+			&& isset($config['slugHistory']) && $config['slugHistory']
+			&& isset($changeSet[$field])) {
+
+            $slugEntryClass = $this->getSlugEntryClass($ea, $meta->name);
+            $slugEntryMeta = $om->getClassMetadata($slugEntryClass);
+
+			$repository = $om->getRepository($slugEntryClass);
+			$slugEntry = $repository->findOneBy(array(
+				'slugField' => $field,
+				'slugValue' => $changeSet[$field][0],
+				'objectClass' => $meta->name
+			));
+
+			if ($slugEntry) { // Redefine slug
+				$slugEntry->setObjectId($wrapped->getIdentifier());
+				$slugEntry->setCreated();
+			} else { // Slug is not in the history
+				$slugEntry = $slugEntryMeta->newInstance();
+
+				$slugEntry->setObjectClass($meta->name);
+				$slugEntry->setCreated();
+				$slugEntry->setObjectId($wrapped->getIdentifier());
+				$slugEntry->setSlugField($field);
+				$slugEntry->setSlugValue($changeSet[$field][0]);
+			}
+
+			$om->persist($slugEntry);
+            $uow->computeChangeSet($slugEntryMeta, $slugEntry);
+        }
+    }
+
+    /**
+     * Delete a Slug history instance
+     *
+     * @param object $object
+     * @param LoggableAdapter $ea
+     * @return void
+     */
+    protected function deleteSlugEntries($field, $object, SluggableAdapter $ea)
+    {
+        $om = $ea->getObjectManager();
+        $wrapped = AbstractWrapper::wrap($object, $om);
+        $meta = $wrapped->getMetadata();
+        if ($config = $this->getConfiguration($om, $meta->name)) {
+
+            $slugEntryClass = $this->getSlugEntryClass($ea, $meta->name);
+            $slugEntryMeta = $om->getClassMetadata($slugEntryClass);
+
+			$repository = $om->getRepository($slugEntryClass);
+			$slugEntries = $repository->findBy(array(
+				'objectClass' => $meta->name,
+				'objectId' => $wrapped->getIdentifier()
+			));
+
+			foreach ($slugEntries as $slugEntry) {
+				$om->remove($slugEntry);
+			}
+        }
+    }
+
+    /**
+     * Get the SlugEntry class
+     *
+     * @param LoggableAdapter $ea
+     * @param string $class
+     * @return string
+     */
+    protected function getSlugEntryClass(SluggableAdapter $ea, $class)
+    {
+        return isset(self::$configurations[$this->name][$class]['slugEntryClass']) ?
+            self::$configurations[$this->name][$class]['slugEntryClass'] :
+            $ea->getDefaultSlugEntryClass();
+    }
 }
