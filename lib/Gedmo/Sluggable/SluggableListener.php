@@ -462,7 +462,7 @@ class SluggableListener extends MappedEventSubscriber
 		$changeSet = $ea->getObjectChangeSet($uow, $object);
         if (($config = $this->getConfiguration($om, $meta->name))
 			&& isset($config['slugHistory']) && $config['slugHistory']
-			&& isset($changeSet[$field])) {
+			&& isset($changeSet[$field]) && $changeSet[$field][0]) {
 
             $slugEntryClass = $this->getSlugEntryClass($ea, $meta->name);
             $slugEntryMeta = $om->getClassMetadata($slugEntryClass);
