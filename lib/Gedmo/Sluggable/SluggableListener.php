@@ -176,21 +176,24 @@ class SluggableListener extends MappedEventSubscriber
                 foreach ($config['slugs'] as $slugField => $options) {
                     $slug = $meta->getReflectionProperty($slugField)->getValue($object);
                     $this->persistedSlugs[$config['useObjectClass']][$slugField][] = $slug;
-	                // Store old slug to slug history
-					$this->createSlugEntry($slugField, $object, $ea);
+                    // Store old slug to slug history
+                    $changeSet = $ea->getObjectChangeSet($uow, $object);
+                    if (isset($config['slugHistory']) && $config['slugHistory']
+                        && isset($changeSet[$slugField]) && $changeSet[$slugField][0])
+                        $this->createSlugEntry($slugField, $changeSet[$slugField][0], $object, $ea);
                 }
             }
         }
-		// Delete all slug history entries
-		// if the entity is deleted
-		foreach ($ea->getScheduledObjectDeletions($uow) as $object) {
+        // Delete all slug history entries
+        // if the entity is deleted
+        foreach ($ea->getScheduledObjectDeletions($uow) as $object) {
             $meta = $om->getClassMetadata(get_class($object));
-			if ($config = $this->getConfiguration($om, $meta->name)) {
-				foreach ($config['slugs'] as $slugField => $options) {
-					$this->deleteSlugEntries($slugField, $object, $ea);
-				}
-			}
-		}
+            if ($config = $this->getConfiguration($om, $meta->name)) {
+                foreach ($config['slugs'] as $slugField => $options) {
+                    $this->deleteSlugEntries($slugField, $object, $ea);
+                }
+            }
+        }
     }
 
     /**
@@ -341,7 +344,7 @@ class SluggableListener extends MappedEventSubscriber
                     foreach ($options['handlers'] as $class => $handlerOptions) {
                         $this
                             ->getHandler($class)
-                            ->onSlugCompletion($ea, $options, $object, $slug)
+                            ->onSlugCompletion($ea, $options, $object, $slug, isset($config['slugHistory']) ? $config['slugHistory'] : FALSE)
                         ;
                     }
                 }
@@ -453,43 +456,38 @@ class SluggableListener extends MappedEventSubscriber
      * @param LoggableAdapter $ea
      * @return void
      */
-    protected function createSlugEntry($field, $object, SluggableAdapter $ea)
+    public function createSlugEntry($field, $slug, $object, SluggableAdapter $ea)
     {
         $om = $ea->getObjectManager();
         $wrapped = AbstractWrapper::wrap($object, $om);
         $meta = $wrapped->getMetadata();
-		$uow = $om->getUnitOfWork();
-		$changeSet = $ea->getObjectChangeSet($uow, $object);
-        if (($config = $this->getConfiguration($om, $meta->name))
-			&& isset($config['slugHistory']) && $config['slugHistory']
-			&& isset($changeSet[$field]) && $changeSet[$field][0]) {
+        $uow = $om->getUnitOfWork();
 
-            $slugEntryClass = $this->getSlugEntryClass($ea, $meta->name);
-            $slugEntryMeta = $om->getClassMetadata($slugEntryClass);
+        $slugEntryClass = $this->getSlugEntryClass($ea, $meta->name);
+        $slugEntryMeta = $om->getClassMetadata($slugEntryClass);
 
-			$repository = $om->getRepository($slugEntryClass);
-			$slugEntry = $repository->findOneBy(array(
-				'slugField' => $field,
-				'slugValue' => $changeSet[$field][0],
-				'objectClass' => $meta->name
-			));
+        $repository = $om->getRepository($slugEntryClass);
+        $slugEntry = $repository->findOneBy(array(
+            'slugField' => $field,
+            'slugValue' => $slug,
+            'objectClass' => $meta->name
+        ));
 
-			if ($slugEntry) { // Redefine slug
-				$slugEntry->setObjectId($wrapped->getIdentifier());
-				$slugEntry->setCreated();
-			} else { // Slug is not in the history
-				$slugEntry = $slugEntryMeta->newInstance();
+        if ($slugEntry) { // Redefine slug
+            $slugEntry->setObjectId($wrapped->getIdentifier());
+            $slugEntry->setCreated();
+        } else { // Slug is not in the history
+            $slugEntry = $slugEntryMeta->newInstance();
 
-				$slugEntry->setObjectClass($meta->name);
-				$slugEntry->setCreated();
-				$slugEntry->setObjectId($wrapped->getIdentifier());
-				$slugEntry->setSlugField($field);
-				$slugEntry->setSlugValue($changeSet[$field][0]);
-			}
-
-			$om->persist($slugEntry);
-            $uow->computeChangeSet($slugEntryMeta, $slugEntry);
+            $slugEntry->setObjectClass($meta->name);
+            $slugEntry->setCreated();
+            $slugEntry->setObjectId($wrapped->getIdentifier());
+            $slugEntry->setSlugField($field);
+            $slugEntry->setSlugValue($slug);
         }
+
+        $om->persist($slugEntry);
+        $uow->computeChangeSet($slugEntryMeta, $slugEntry);
     }
 
     /**
@@ -509,15 +507,15 @@ class SluggableListener extends MappedEventSubscriber
             $slugEntryClass = $this->getSlugEntryClass($ea, $meta->name);
             $slugEntryMeta = $om->getClassMetadata($slugEntryClass);
 
-			$repository = $om->getRepository($slugEntryClass);
-			$slugEntries = $repository->findBy(array(
-				'objectClass' => $meta->name,
-				'objectId' => $wrapped->getIdentifier()
-			));
+            $repository = $om->getRepository($slugEntryClass);
+            $slugEntries = $repository->findBy(array(
+                'objectClass' => $meta->name,
+                'objectId' => $wrapped->getIdentifier()
+            ));
 
-			foreach ($slugEntries as $slugEntry) {
-				$om->remove($slugEntry);
-			}
+            foreach ($slugEntries as $slugEntry) {
+                $om->remove($slugEntry);
+            }
         }
     }
 

@@ -40,6 +40,16 @@ interface SluggableAdapter extends AdapterInterface
     function replaceRelative($object, array $config, $target, $replacement);
 
     /**
+     * Get all objects with part of slug
+     * matching $target pattern
+     *
+     * @param array $config
+     * @param string $target
+     * @return object
+     */
+    function getRelative(array $config, $target);
+
+    /**
     * Replace part of slug to all objects
     * matching $target pattern and having $object
     * related

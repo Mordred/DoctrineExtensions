@@ -104,7 +104,7 @@ class TreeSlugHandler implements SlugHandlerInterface
             $this->parentSlug = $parent->getPropertyValue($config['slug']);
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -126,7 +126,7 @@ class TreeSlugHandler implements SlugHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public function onSlugCompletion(SluggableAdapter $ea, array &$config, $object, &$slug)
+    public function onSlugCompletion(SluggableAdapter $ea, array &$config, $object, &$slug, $history = FALSE)
     {
         if (!$this->isInsert) {
             $options = $config['handlers'][get_called_class()];
@@ -134,6 +134,15 @@ class TreeSlugHandler implements SlugHandlerInterface
             $meta = $wrapped->getMetadata();
             $target = $wrapped->getPropertyValue($config['slug']);
             $config['pathSeparator'] = $this->usedPathSeparator;
+            // Store old slug to history
+            if ($history) {
+                $relatives = $ea->getRelative($config, $target.$config['pathSeparator']);
+                foreach ($relatives as $relative) {
+                    $w = AbstractWrapper::wrap($relative, $this->om);
+                    $s = $w->getPropertyValue($config['slug']);
+                    $this->sluggable->createSlugEntry($config['slug'], $s, $relative, $ea);
+                }
+            }
             $ea->replaceRelative($object, $config, $target.$config['pathSeparator'], $slug);
             $uow = $this->om->getUnitOfWork();
             // update in memory objects

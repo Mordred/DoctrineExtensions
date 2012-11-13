@@ -27,7 +27,7 @@ final class ORM extends BaseAdapterORM implements SluggableAdapter
         return 'Gedmo\\Sluggable\\Entity\\SlugEntry';
     }
 
-	/**
+    /**
      * {@inheritDoc}
      */
     public function getSimilarSlugs($object, $meta, array $config, $slug)
@@ -84,7 +84,26 @@ final class ORM extends BaseAdapterORM implements SluggableAdapter
     }
 
     /**
-    * {@inheritDoc}
+     * {@inheritDoc}
+     */
+    public function getRelative(array $config, $target)
+    {
+        $em = $this->getObjectManager();
+        $qb = $em->createQueryBuilder('rec');
+        $qb->select('rec')
+			->from($config['useObjectClass'], 'rec')
+			->where($qb->expr()->like(
+                'rec.'.$config['slug'],
+                $qb->expr()->literal($target . '%'))
+            )
+        ;
+
+        $q = $qb->getQuery();
+        return $q->getResult();
+    }
+
+    /**
+     * {@inheritDoc}
      */
     public function replaceInverseRelative($object, array $config, $target, $replacement)
     {
