@@ -23,7 +23,7 @@ use Doctrine\ORM\Mapping\Entity;
  * @subpackage SlugEntry
  * @license MIT License (http://www.opensource.org/licenses/mit-license.php)
  */
-class SlugEntry extends MappedSuperclass\AbstractLogEntry {
+class SlugEntry extends MappedSuperclass\AbstractSlugEntry {
     /**
      * All required columns are mapped through inherited superclass
      */
