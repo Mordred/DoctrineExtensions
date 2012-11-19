@@ -188,7 +188,8 @@ class SluggableListener extends MappedEventSubscriber
         // if the entity is deleted
         foreach ($ea->getScheduledObjectDeletions($uow) as $object) {
             $meta = $om->getClassMetadata(get_class($object));
-            if ($config = $this->getConfiguration($om, $meta->name)) {
+            if (($config = $this->getConfiguration($om, $meta->name))
+                    && isset($config['slugHistory']) && $config['slugHistory']) {
                 foreach ($config['slugs'] as $slugField => $options) {
                     $this->deleteSlugEntries($slugField, $object, $ea);
                 }
