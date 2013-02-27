@@ -7,6 +7,7 @@ use Gedmo\Sluggable\SluggableListener;
 use Gedmo\Sluggable\Mapping\Event\SluggableAdapter;
 use Gedmo\Tool\Wrapper\AbstractWrapper;
 use Gedmo\Exception\InvalidMappingException;
+use Doctrine\Common\Persistence\Mapping\ClassMetadata;
 
 /**
 * Sluggable handler which should be used in order to prefix
@@ -109,7 +110,7 @@ class FirstRelativeSlugHandler implements SlugHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public static function validate(array $options, $meta)
+    public static function validate(array $options, ClassMetadata $meta)
     {
 		$parts = explode('.', $options['relationField']);
         if (!$meta->isCollectionValuedAssociation($parts[0])) {
