@@ -186,9 +186,7 @@ class SortableListener extends MappedEventSubscriber
         // Get groups
         $groups = $this->getGroups($meta, $config, $object);
         foreach ($groups as $group => $value) {
-            $changed = $changed ||
-                (array_key_exists($group, $changeSet)
-                    && $changeSet[$group][0] != $changeSet[$group][1]);
+            $changed = $changed || array_key_exists($group, $changeSet);
         }
 
         if (array_key_exists($config['position'], $changeSet)) {
