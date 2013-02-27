@@ -60,9 +60,9 @@ class Annotation extends AbstractAnnotationDriver
      * {@inheritDoc}
      */
     public function readExtendedMetadata($meta, array &$config) {
-        $class = $this->getMetaReflectionClass($meta);
+        $metaReflectionClass = $this->getMetaReflectionClass($meta);
         // property annotations
-        foreach ($class->getProperties() as $property) {
+        foreach ($metaReflectionClass->getProperties() as $property) {
             if ($meta->isMappedSuperclass && !$property->isPrivate() ||
                 // TODO: Add @AttributeOverride support
                 //$meta->isInheritedField($property->name) ||
@@ -149,7 +149,7 @@ class Annotation extends AbstractAnnotationDriver
         }
 
         // class annotations
-        if ($config && ($annot = $this->reader->getClassAnnotation($class, self::SLUG_HISTORY))) {
+        if ($config && ($annot = $this->reader->getClassAnnotation($metaReflectionClass, self::SLUG_HISTORY))) {
             $config['slugHistory'] = TRUE;
             if ($annot->slugEntryClass) {
                 if (!class_exists($annot->slugEntryClass)) {
