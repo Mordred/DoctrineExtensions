@@ -89,8 +89,8 @@ class Annotation extends AbstractAnnotationDriver
                         if (!strlen($handler->class)) {
                             throw new InvalidMappingException("SlugHandler class: {$handler->class} should be a valid class name in entity - {$meta->name}");
                         }
-                        $handlerClass = $handler->class;
-                        $handlers[$handlerClass] = array();
+                        $class = $handler->class;
+                        $handlers[$class] = array();
                         foreach ((array)$handler->options as $option) {
                             if (!$option instanceof SlugHandlerOption) {
                                 throw new InvalidMappingException("SlugHandlerOption: {$option} should be instance of SlugHandlerOption annotation in entity - {$meta->name}");
@@ -98,12 +98,11 @@ class Annotation extends AbstractAnnotationDriver
                             if (!strlen($option->name)) {
                                 throw new InvalidMappingException("SlugHandlerOption name: {$option->name} should be valid name in entity - {$meta->name}");
                             }
-                            $handlers[$handlerClass][$option->name] = $option->value;
+                            $handlers[$class][$option->name] = $option->value;
                         }
-                        $handlerClass::validate($handlers[$handlerClass], $meta);
+                        $class::validate($handlers[$class], $meta);
                     }
                 }
-
                 // process slug fields
                 if (empty($slug->fields) || !is_array($slug->fields)) {
                     throw new InvalidMappingException("Slug must contain at least one field for slug generation in class - {$meta->name}");

@@ -7,6 +7,7 @@ use Gedmo\Sluggable\SluggableListener;
 use Gedmo\Sluggable\Mapping\Event\SluggableAdapter;
 use Gedmo\Tool\Wrapper\AbstractWrapper;
 use Gedmo\Exception\InvalidMappingException;
+use Doctrine\Common\Persistence\Mapping\ClassMetadata;
 
 /**
 * Sluggable handler which should be used for inversed relation mapping
@@ -22,12 +23,12 @@ use Gedmo\Exception\InvalidMappingException;
 class InversedRelativeSlugHandler implements SlugHandlerInterface
 {
     /**
-     * @var Doctrine\Common\Persistence\ObjectManager
+     * @var ObjectManager
      */
     protected $om;
 
     /**
-     * @var Gedmo\Sluggable\SluggableListener
+     * @var SluggableListener
      */
     protected $sluggable;
 
@@ -59,7 +60,7 @@ class InversedRelativeSlugHandler implements SlugHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public static function validate(array $options, $meta)
+    public static function validate(array $options, ClassMetadata $meta)
     {
         if (!isset($options['relationClass']) || !strlen($options['relationClass'])) {
             throw new InvalidMappingException("'relationClass' option must be specified for object slug mapping - {$meta->name}");
@@ -70,14 +71,6 @@ class InversedRelativeSlugHandler implements SlugHandlerInterface
         if (!isset($options['inverseSlugField']) || !strlen($options['inverseSlugField'])) {
             throw new InvalidMappingException("'inverseSlugField' option must be specified for object slug mapping - {$meta->name}");
         }
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public function handlesUrlization()
-    {
-        return false;
     }
 
     /**
@@ -128,5 +121,13 @@ class InversedRelativeSlugHandler implements SlugHandlerInterface
                 }
             }
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function handlesUrlization()
+    {
+        return false;
     }
 }

@@ -3,34 +3,34 @@
 namespace Gedmo\Sluggable\Handler;
 
 use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\Common\Persistence\Mapping\ClassMetadata;
 use Gedmo\Sluggable\SluggableListener;
 use Gedmo\Sluggable\Mapping\Event\SluggableAdapter;
 use Gedmo\Tool\Wrapper\AbstractWrapper;
 use Gedmo\Exception\InvalidMappingException;
-use Gedmo\Sluggable\Util\Urlizer;
 
 /**
-* Sluggable handler which slugs all parent nodes
-* recursively and synchronizes on updates. For instance
-* category tree slug could look like "food/fruits/apples"
-*
-* @author Gediminas Morkevicius <gediminas.morkevicius@gmail.com>
-* @package Gedmo.Sluggable.Handler
-* @subpackage TreeSlugHandler
-* @link http://www.gediminasm.org
-* @license MIT License (http://www.opensource.org/licenses/mit-license.php)
-*/
+ * Sluggable handler which slugs all parent nodes
+ * recursively and synchronizes on updates. For instance
+ * category tree slug could look like "food/fruits/apples"
+ *
+ * @author Gediminas Morkevicius <gediminas.morkevicius@gmail.com>
+ * @package Gedmo.Sluggable.Handler
+ * @subpackage TreeSlugHandler
+ * @link http://www.gediminasm.org
+ * @license MIT License (http://www.opensource.org/licenses/mit-license.php)
+ */
 class TreeSlugHandler implements SlugHandlerInterface
 {
     const SEPARATOR = '/';
 
     /**
-     * @var Doctrine\Common\Persistence\ObjectManager
+     * @var ObjectManager
      */
     protected $om;
 
     /**
-     * @var Gedmo\Sluggable\SluggableListener
+     * @var SluggableListener
      */
     protected $sluggable;
 
@@ -108,15 +108,7 @@ class TreeSlugHandler implements SlugHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public function handlesUrlization()
-    {
-        return true;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public static function validate(array $options, $meta)
+    public static function validate(array $options, ClassMetadata $meta)
     {
         if (!$meta->isSingleValuedAssociation($options['parentRelationField'])) {
             throw new InvalidMappingException("Unable to find tree parent slug relation through field - [{$options['parentRelationField']}] in class - {$meta->name}");
@@ -129,7 +121,6 @@ class TreeSlugHandler implements SlugHandlerInterface
     public function onSlugCompletion(SluggableAdapter $ea, array &$config, $object, &$slug, $history = FALSE)
     {
         if (!$this->isInsert) {
-            $options = $config['handlers'][get_called_class()];
             $wrapped = AbstractWrapper::wrap($object, $this->om);
             $meta = $wrapped->getMetadata();
             $target = $wrapped->getPropertyValue($config['slug']);
@@ -182,12 +173,18 @@ class TreeSlugHandler implements SlugHandlerInterface
             $this->originalTransliterator,
             array($text, $separator, $object)
         );
-        // For tree slugs, we "urlize" each part of the slug before appending "/"
-        $slug = Urlizer::urlize($slug, $separator);
         if (strlen($this->parentSlug)) {
             $slug = $this->parentSlug . $this->usedPathSeparator . $slug;
         }
         $this->sluggable->setTransliterator($this->originalTransliterator);
         return $slug;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function handlesUrlization()
+    {
+        return true;
     }
 }

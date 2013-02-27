@@ -15,6 +15,10 @@ Features:
 [blog_reference]: http://gediminasm.org/article/sluggable-behavior-extension-for-doctrine-2 "Sluggable extension for Doctrine 2 makes automatic record field transformations into url friendly names"
 [blog_test]: http://gediminasm.org/test "Test extensions on this blog"
 
+Update **2012-11-30**
+
+- Recreated slug handlers, as they are used by many people
+
 Update **2012-02-26**
 
 - Remove slug handlers were removed because of complications it brought together
@@ -54,7 +58,7 @@ This article will cover the basic installation and functionality of **Sluggable*
 behavior
 
 Content:
-    
+
 - [Including](#including-extension) the extension
 - Entity [example](#entity-mapping)
 - Document [example](#document-mapping)
@@ -102,7 +106,7 @@ use Doctrine\ORM\Mapping as ORM;
  */
 class Article
 {
-    /** 
+    /**
      * @ORM\Id
      * @ORM\GeneratedValue
      * @ORM\Column(type="integer")
@@ -173,7 +177,7 @@ use Gedmo\Mapping\Annotation as Gedmo;
  */
 class Article
 {
-    /** 
+    /**
      * @ODM\Id
      */
     private $id;
@@ -314,6 +318,65 @@ echo $article->getSlug();
 - **unique** (optional, default=true) - **true** if slug should be unique and if identical it will be prefixed, **false** - otherwise
 - **separator** (optional, default="-") - separator which will separate words in slug
 - **style** (optional, default="default") - **"default"** all letters will be lowercase, **"camel"** - first word letter will be uppercase
+- **handlers** (optional, default=[]) - list of slug handlers, like tree path slug, or customized, for example see bellow
+
+**Note**: handlers are totally optional
+
+**TreeSlugHandler**
+
+``` php
+<?php
+/**
+ * @Gedmo\Mapping\Annotation\Slug(handlers={
+ *      @Gedmo\Mapping\Annotation\SlugHandler(class="Gedmo\Sluggable\Handler\TreeSlugHandler", options={
+ *          @Gedmo\Mapping\Annotation\SlugHandlerOption(name="parentRelationField", value="parent"),
+ *          @Gedmo\Mapping\Annotation\SlugHandlerOption(name="separator", value="/")
+ *      })
+ * }, fields={"title", "code"})
+ * @Doctrine\ORM\Mapping\Column(length=64, unique=true)
+ */
+private $slug;
+```
+
+**RelativeSlugHandler**:
+
+``` php
+<?php
+/**
+ * Person domain object class
+ *
+ * @Gedmo\Mapping\Annotation\Slug(handlers={
+ *      @Gedmo\Mapping\Annotation\SlugHandler(class="Gedmo\Sluggable\Handler\RelativeSlugHandler", options={
+ *          @Gedmo\Mapping\Annotation\SlugHandlerOption(name="relationField", value="category"),
+ *          @Gedmo\Mapping\Annotation\SlugHandlerOption(name="relationSlugField", value="slug"),
+ *          @Gedmo\Mapping\Annotation\SlugHandlerOption(name="separator", value="/")
+ *      })
+ * }, fields={"title", "code"})
+ * @Doctrine\ORM\Mapping\Column(length=64, unique=true)
+ */
+private $slug;
+```
+
+**Note:** if you used **RelativeSlugHandler** - relation object should use in order to sync changes:
+
+**InversedRelativeSlugHandler**
+
+``` php
+<?php
+/**
+ * Category domain object class
+ *
+ * @Gedmo\Mapping\Annotation\Slug(handlers={
+ *      @Gedmo\Mapping\Annotation\SlugHandler(class="Gedmo\Sluggable\Handler\InversedRelativeSlugHandler", options={
+ *          @Gedmo\Mapping\Annotation\SlugHandlerOption(name="relationClass", value="App\Entity\Person"),
+ *          @Gedmo\Mapping\Annotation\SlugHandlerOption(name="mappedBy", value="category"),
+ *          @Gedmo\Mapping\Annotation\SlugHandlerOption(name="inverseSlugField", value="slug")
+ *      })
+ * }, fields={"title"})
+ * @Doctrine\ORM\Mapping\Column(length=64, unique=true)
+ */
+private $slug;
+```
 
 ### Example
 
@@ -440,7 +503,7 @@ use Doctrine\ORM\Mapping as ORM;
  */
 class Article
 {
-    /** 
+    /**
      * @ORM\Id
      * @ORM\GeneratedValue
      * @ORM\Column(type="integer")
@@ -458,26 +521,26 @@ class Article
      * @ORM\Column(length=16)
      */
     private $code;
-    
+
     /**
      * @Gedmo\Translatable
      * @Gedmo\Slug(fields={"title", "code"})
      * @ORM\Column(length=128, unique=true)
      */
     private $slug;
-    
+
     /**
      * @ORM\Column(type="string", length=64)
      */
     private $uniqueTitle;
-    
+
     /**
      * @Gedmo\Slug(fields={"uniqueTitle"})
      * @ORM\Column(type="string", length=128, unique=true)
      */
     private $uniqueSlug;
 
-    
+
 
     public function getId()
     {
@@ -508,7 +571,7 @@ class Article
     {
         return $this->slug;
     }
-    
+
     public function getUniqueSlug()
     {
         return $this->uniqueSlug;
@@ -517,5 +580,179 @@ class Article
 ```
 
 Now the generated slug will be translated by Translatable behavior
+
+<a name="slug-handlers"></a>
+
+## Using slug handlers:
+
+There are built-in slug handlers like described in configuration options of slug, but there
+can be also customized slug handlers depending on use cases. Usually the most logic use case
+is for related slug. For instance if user has a **ManyToOne relation to a **Company** we
+would like to have a url like **http://example.com/knplabs/gedi where **KnpLabs**
+is a company and user name is **Gedi**. In this case relation has a path separator **/**
+
+User entity example:
+
+``` php
+<?php
+namespace Sluggable\Fixture\Handler;
+
+use Gedmo\Mapping\Annotation as Gedmo;
+use Doctrine\ORM\Mapping as ORM;
+
+/**
+ * @ORM\Entity
+ */
+class User
+{
+    /**
+     * @ORM\Id
+     * @ORM\GeneratedValue
+     * @ORM\Column(type="integer")
+     */
+    private $id;
+
+    /**
+     * @ORM\Column(length=64)
+     */
+    private $username;
+
+    /**
+     * @Gedmo\Slug(handlers={
+     *      @Gedmo\SlugHandler(class="Gedmo\Sluggable\Handler\RelativeSlugHandler", options={
+     *          @Gedmo\SlugHandlerOption(name="relationField", value="company"),
+     *          @Gedmo\SlugHandlerOption(name="relationSlugField", value="alias"),
+     *          @Gedmo\SlugHandlerOption(name="separator", value="/")
+     *      })
+     * }, separator="-", updatable=true, fields={"username"})
+     * @ORM\Column(length=64, unique=true)
+     */
+    private $slug;
+
+    /**
+     * @ORM\ManyToOne(targetEntity="Company")
+     */
+    private $company;
+
+    public function setCompany(Company $company = null)
+    {
+        $this->company = $company;
+    }
+
+    public function getCompany()
+    {
+        return $this->company;
+    }
+
+    public function getId()
+    {
+        return $this->id;
+    }
+
+    public function setName($name)
+    {
+        $this->name = $name;
+    }
+
+    public function getName()
+    {
+        return $this->name;
+    }
+
+    public function getSlug()
+    {
+        return $this->slug;
+    }
+}
+```
+
+Company entity example:
+
+``` php
+<?php
+namespace Sluggable\Fixture\Handler;
+
+use Gedmo\Mapping\Annotation as Gedmo;
+use Doctrine\ORM\Mapping as ORM;
+
+/**
+ * @ORM\Entity
+ */
+class Company
+{
+    /**
+     * @ORM\Id
+     * @ORM\GeneratedValue
+     * @ORM\Column(type="integer")
+     */
+    private $id;
+
+    /**
+     * @ORM\Column(length=64)
+     */
+    private $title;
+
+    /**
+     * @Gedmo\Slug(handlers={
+     *      @Gedmo\SlugHandler(class="Gedmo\Sluggable\Handler\InversedRelativeSlugHandler", options={
+     *          @Gedmo\SlugHandlerOption(name="relationClass", value="Sluggable\Fixture\Handler\User"),
+     *          @Gedmo\SlugHandlerOption(name="mappedBy", value="company"),
+     *          @Gedmo\SlugHandlerOption(name="inverseSlugField", value="slug")
+     *      })
+     * }, fields={"title"})
+     * @ORM\Column(length=64, unique=true)
+     */
+    private $alias;
+
+    public function getId()
+    {
+        return $this->id;
+    }
+
+    public function setTitle($title)
+    {
+        $this->title = $title;
+    }
+
+    public function getTitle()
+    {
+        return $this->title;
+    }
+
+    public function getAlias()
+    {
+        return $this->alias;
+    }
+}
+```
+
+For other mapping drivers see
+[xml](https://github.com/l3pp4rd/DoctrineExtensions/blob/master/tests/Gedmo/Mapping/Driver/Xml/Mapping.Fixture.Xml.Sluggable.dcm.xml) or [yaml](https://github.com/l3pp4rd/DoctrineExtensions/blob/master/tests/Gedmo/Mapping/Driver/Yaml/Mapping.Fixture.Yaml.Category.dcm.yml) examples from tests
+
+And the example usage:
+
+``` php
+<?php
+$company = new Company;
+$company->setTitle('KnpLabs');
+$em->persist($company);
+
+$gedi = new User;
+$gedi->setUsername('Gedi');
+$gedi->setCompany($company);
+$em->persist($gedi);
+
+$em->flush();
+
+echo $gedi->getSlug(); // outputs "knplabs/gedi"
+
+$company->setTitle('KnpLabs Nantes');
+$em->persist($company);
+$em->flush();
+
+echo $gedi->getSlug(); // outputs "knplabs-nantes/gedi"
+```
+
+**Note:** tree slug handler, takes a parent relation to build slug recursively.
 
 Any suggestions on improvements are very welcome

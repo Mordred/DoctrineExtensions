@@ -63,6 +63,14 @@ class Validator
         'decimal'
     );
 
+    /**
+     * Whether to validate if the directory of the file exists and is writable, useful to disable it when using
+     * stream wrappers which don't support is_dir (like Gaufrette)
+     *
+     * @var bool
+     */
+    public static $validateWritableDirectory = true;
+
 
     public static function validateFileMimeTypeField(ClassMetadataInfo $meta, $field)
     {
@@ -81,6 +89,11 @@ class Validator
 
     public static function validateField($meta, $field, $uploadableField, $validFieldTypes)
     {
+        
+        if ($meta->isMappedSuperclass) {
+            return;
+        }
+        
         $fieldMapping = $meta->getFieldMapping($field);
 
         if (!in_array($fieldMapping['type'], $validFieldTypes)) {
@@ -100,7 +113,7 @@ class Validator
             throw new UploadableInvalidPathException('Path must be a string containing the path to a valid directory.');
         }
 
-        if (!is_dir($path) || !is_writable($path)) {
+        if (self::$validateWritableDirectory && (!is_dir($path) || !is_writable($path))) {
             throw new UploadableCantWriteException(sprintf('Directory "%s" does not exist or is not writable',
                 $path
             ));

@@ -7,6 +7,7 @@ use Doctrine\ORM\Query,
     Gedmo\Tree\Strategy,
     Gedmo\Tree\Strategy\ORM\Nested,
     Gedmo\Exception\InvalidArgumentException,
+    Gedmo\Exception\UnexpectedValueException,
     Doctrine\ORM\Proxy\Proxy;
 
 /**
@@ -102,6 +103,15 @@ class NestedTreeRepository extends AbstractTreeRepository
                     throw new \Gedmo\Exception\InvalidArgumentException('If "Of" is specified you must provide parent or sibling as the second argument');
                 }
                 $parentOrSibling = $args[1];
+                if (strstr($method,'Sibling')) {
+                    $wrappedParentOrSibling = new EntityWrapper($parentOrSibling, $this->_em);
+                    $newParent = $wrappedParentOrSibling->getPropertyValue($config['parent']);
+                    if (is_null($newParent)) {
+                        throw new UnexpectedValueException("Cannot persist sibling for a root node, tree operation is not possible");
+                    }
+                    $node->sibling = $parentOrSibling;
+                    $parentOrSibling = $newParent;
+                }
                 $wrapped->setPropertyValue($config['parent'], $parentOrSibling);
                 $position = substr($position, 0, -2);
             }
@@ -775,10 +785,10 @@ class NestedTreeRepository extends AbstractTreeRepository
     }
 
     /**
-     * Reorders the sibling nodes and child nodes by given $node,
+     * Reorders $node's sibling nodes and child nodes,
      * according to the $sortByField and $direction specified
      *
-     * @param object $node - from which node to start reordering the tree
+     * @param object|null $node - node from which to start reordering the tree; null will reorder everything
      * @param string $sortByField - field name to sort by
      * @param string $direction - sort direction : "ASC" or "DESC"
      * @param boolean $verify - true to verify tree first
@@ -787,7 +797,7 @@ class NestedTreeRepository extends AbstractTreeRepository
     public function reorder($node, $sortByField = null, $direction = 'ASC', $verify = true)
     {
         $meta = $this->getClassMetadata();
-        if ($node instanceof $meta->name) {
+        if ($node instanceof $meta->name || $node==null) {
             $config = $this->listener->getConfiguration($this->_em, $meta->name);
             if ($verify && is_array($this->verify($this->listener->getStrategy($this->_em, $meta->name)->getGroupFields($this->_em, $node)))) {
                 return false;
@@ -806,6 +816,19 @@ class NestedTreeRepository extends AbstractTreeRepository
         } else {
             throw new InvalidArgumentException("Node is not related to this repository");
         }
+    }
+
+    /**
+     * Reorders all nodes in the tree according to the $sortByField and $direction specified.
+     *
+     * @param string $sortByField - field name to sort by
+     * @param string $direction - sort direction : "ASC" or "DESC"
+     * @param boolean $verify - true to verify tree first
+     * @return void
+     */
+    public function reorderAll($sortByField = null, $direction = 'ASC', $verify = true)
+    {
+        $this->reorder(null, $sortByField, $direction, $verify);
     }
 
     /**

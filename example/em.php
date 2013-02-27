@@ -6,52 +6,28 @@
  */
 // connection args, modify at will
 $connection = array(
-    'host' => '127.0.0.1',
+    'host' => 'localhost',
     'port' => 3306,
     'user' => 'root',
     'password' => 'nimda',
     'dbname' => 'test',
     'driver' => 'pdo_mysql'
 );
-
-// First of all autoloading of vendors
-
-$vendorPath = realpath(__DIR__.'/../vendor');
-$gedmoPath = realpath(__DIR__.'/../lib');
-
-$doctrineClassLoaderFile = $vendorPath.'/doctrine-common/lib/Doctrine/Common/ClassLoader.php';
-if (!file_exists($doctrineClassLoaderFile)) {
-    die('cannot find vendor, run: php bin/vendors.php to install doctrine');
+if (!file_exists(__DIR__.'/../vendor/autoload.php')) {
+    die('cannot find vendors, read README.md how to use composer');
 }
-
-require $doctrineClassLoaderFile;
-use Doctrine\Common\ClassLoader;
-// autoload all vendors
-
-$loader = new ClassLoader('Doctrine\Common', $vendorPath.'/doctrine-common/lib');
-$loader->register();
-
-$loader = new ClassLoader('Doctrine\DBAL', $vendorPath.'/doctrine-dbal/lib');
-$loader->register();
-
-$loader = new ClassLoader('Doctrine\ORM', $vendorPath.'/doctrine-orm/lib');
-$loader->register();
+// First of all autoloading of vendors
+$loader = require __DIR__.'/../vendor/autoload.php';
 
 // gedmo extensions
-$loader = new ClassLoader('Gedmo', $gedmoPath);
-$loader->register();
-
-// if you use yaml, you need a yaml parser, same as command line tool
-$loader = new ClassLoader('Symfony', $vendorPath);
-$loader->register();
+$loader->add('Gedmo', __DIR__.'/../lib');
 
 // autoloader for Entity namespace
-$loader = new ClassLoader('Entity', __DIR__.'/app');
-$loader->register();
+$loader->add('Entity', __DIR__.'/app');
 
 // ensure standard doctrine annotations are registered
 Doctrine\Common\Annotations\AnnotationRegistry::registerFile(
-    $vendorPath.'/doctrine-orm/lib/Doctrine/ORM/Mapping/Driver/DoctrineAnnotations.php'
+    __DIR__.'/../vendor/doctrine/orm/lib/Doctrine/ORM/Mapping/Driver/DoctrineAnnotations.php'
 );
 
 // Second configure ORM
@@ -118,6 +94,14 @@ $timestampableListener = new Gedmo\Timestampable\TimestampableListener;
 $timestampableListener->setAnnotationReader($cachedAnnotationReader);
 $evm->addEventSubscriber($timestampableListener);
 
+// blameable
+
+$blameableListener = new \Gedmo\Blameable\BlameableListener();
+$blameableListener->setAnnotationReader($cachedAnnotationReader);
+$blameableListener->setUserValue('MyUsername'); // determine from your environment
+$evm->addEventSubscriber($blameableListener);
+
+
 // translatable
 $translatableListener = new Gedmo\Translatable\TranslatableListener;
 // current translation locale should be set from session or hook later into the listener
@@ -136,3 +120,4 @@ $evm->addEventSubscriber($translatableListener);
 $evm->addEventSubscriber(new Doctrine\DBAL\Event\Listeners\MysqlSessionInit());
 // Finally, create entity manager
 return Doctrine\ORM\EntityManager::create($connection, $config, $evm);
+

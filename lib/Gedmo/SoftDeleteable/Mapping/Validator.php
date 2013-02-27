@@ -2,8 +2,8 @@
 
 namespace Gedmo\SoftDeleteable\Mapping;
 
-use Doctrine\ORM\Mapping\ClassMetadataInfo;
 use Gedmo\Exception\InvalidMappingException;
+use Doctrine\Common\Persistence\Mapping\ClassMetadata;
 
 /**
  * This class is used to validate mapping information
@@ -32,8 +32,12 @@ class Validator
     );
 
 
-    public static function validateField(ClassMetadataInfo $meta, $field)
+    public static function validateField(ClassMetadata $meta, $field)
     {
+        if ($meta->isMappedSuperclass) {
+            return;
+        }
+
         $fieldMapping = $meta->getFieldMapping($field);
 
         if (!in_array($fieldMapping['type'], self::$validTypes)) {

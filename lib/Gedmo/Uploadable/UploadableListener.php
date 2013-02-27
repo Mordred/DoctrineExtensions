@@ -301,7 +301,7 @@ class UploadableListener extends MappedEventSubscriber
 
         Validator::validatePath($path);
 
-        $path = substr($path, strlen($path) - 1) === '/' ? substr($path, 0, strlen($path) - 2) : $path;
+        $path = rtrim($path, '\/');
 
         if ($config['fileMimeTypeField']) {
             $fileMimeTypeField = $refl->getProperty($config['fileMimeTypeField']);
@@ -506,8 +506,8 @@ class UploadableListener extends MappedEventSubscriber
                 $info['fileExtension']
             );
             $info['filePath'] = str_replace(
-                DIRECTORY_SEPARATOR.$info['fileName'],
-                DIRECTORY_SEPARATOR.$filename,
+                '/'.$info['fileName'],
+                '/'.$filename,
                 $info['filePath']
             );
             $info['fileName'] = $filename;
@@ -559,7 +559,7 @@ class UploadableListener extends MappedEventSubscriber
      */
     public function doMoveFile($source, $dest, $isUploadedFile = true)
     {
-        return $isUploadedFile ? move_uploaded_file($source, $dest) : copy($source, $dest);
+        return $isUploadedFile ? @move_uploaded_file($source, $dest) : @copy($source, $dest);
     }
 
     /**
